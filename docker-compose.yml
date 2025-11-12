@@ -1,0 +1,80 @@
+# docker-compose.yml
+# Este archivo define la infraestructura base y los servicios de la aplicación.
+# Versión de la sintaxis de Docker Compose.
+version: '3.8'
+
+services:
+  # Servicio del Event Bus (RabbitMQ)
+  event-bus:
+    image: rabbitmq:3.9-management-alpine
+    container_name: event-bus
+    ports:
+      - "5672:5672"   # Puerto para la conexión de los servicios
+      - "15672:15672" # Puerto para la interfaz de gestión web
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/
+    networks:
+      - ia_evolutiva_net
+
+  # Marcador de posición para el Gateway Service
+  gateway-service:
+    build:
+      context: ./services/gateway-service
+    container_name: gateway-service
+    ports:
+      - "3000:3000"
+    networks:
+      - ia_evolutiva_net
+    depends_on:
+      - event-bus
+
+  # Marcador de posición para el Orchestrator Service
+  orchestrator-service:
+    build:
+      context: ./services/orchestrator-service
+    container_name: orchestrator-service
+    networks:
+      - ia_evolutiva_net
+    depends_on:
+      - event-bus
+
+  # Marcador de posición para el Herrero Adapter Service
+  herrero-adapter-service:
+    build:
+      context: ./services/herrero-adapter-service
+    container_name: herrero-adapter-service
+    networks:
+      - ia_evolutiva_net
+    depends_on:
+      - event-bus
+
+  # Marcador de posición para el Sandbox Service
+  sandbox-service:
+    build:
+      context: ./services/sandbox-service
+    container_name: sandbox-service
+    networks:
+      - ia_evolutiva_net
+    depends_on:
+      - event-bus
+
+  # Marcador de posición para el Logging Service
+  logging-service:
+    build:
+      context: ./services/logging-service
+    container_name: logging-service
+    ports:
+      - "5000:5000"
+    networks:
+      - ia_evolutiva_net
+    depends_on:
+      - event-bus
+
+# Definición de la red personalizada para los servicios
+networks:
+  ia_evolutiva_net:
+    driver: bridge
+
+# Definición de volúmenes para persistencia de datos
+volumes:
+  rabbitmq_data:
