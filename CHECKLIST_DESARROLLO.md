@@ -5,37 +5,37 @@ Este documento detalla la hoja de ruta integral para el desarrollo del sistema, 
 
 Hito 0: Diseño de Arquitectura y Contratos (Fase 00)
 
-[ ] Resultado: El plano arquitectónico (Fase 00) está completo y documentado.
+[x] Resultado: El plano arquitectónico (Fase 00) está completo y documentado.
 
 Capacidades a Validar:
 
-[ ] 1.1 Identificación de Servicios: Se definen las responsabilidades únicas de los servicios centrales (event-bus, gateway-service, orchestrator-service, herrero-adapter-service, sandbox-service, logging-service).
+[x] 1.1 Identificación de Servicios: Se definen las responsabilidades únicas de los servicios centrales (event-bus, gateway-service, orchestrator-service, herrero-adapter-service, sandbox-service, logging-service).
 
-[ ] 2.0 Definición de Contratos: Se crea el documento (o Schema Registry) que define la estructura JSON exacta para cada evento del bus (ej. tarea.crear, resultado.plan_generado, tarea.probar_integracion, etc.).
+[x] 2.0 Definición de Contratos: Se crea el documento (o Schema Registry) que define la estructura JSON exacta para cada evento del bus (ej. tarea.crear, resultado.plan_generado, tarea.probar_integracion, etc.).
 
-[ ] 3.0 Definición de la Máquina de Estados: Se crea el diagrama de flujo que define todos los estados posibles de una tarea en el orchestrator-service.
+[x] 3.0 Definición de la Máquina de Estados: Se crea el diagrama de flujo que define todos los estados posibles de una tarea en el orchestrator-service.
 
-[ ] 3.1 Definición de Monitoreo: Se define la estrategia de Watchdog (Timeout de Silencio y Monitoreo Activo por Consulta).
+[x] 3.1 Definición de Monitoreo: Se define la estrategia de Watchdog (Timeout de Silencio y Monitoreo Activo por Consulta).
 
-[ ] 4.0 Configuración del Entorno: Se crea el Monorepo, el docker-compose.yml base y el andamiaje (scaffolding) de carpetas para cada servicio.
+[x] 4.0 Configuración del Entorno: Se crea el Monorepo, el docker-compose.yml base y el andamiaje (scaffolding) de carpetas para cada servicio.
 
 Estado al Completar: El "plano" del sistema está terminado. Todos los contratos de comunicación están definidos.
 
 Hito 1: Construcción del Chasis (Flujo Simulado - Fase 01)
 
-[ ] Resultado: El "chasis" de la arquitectura está 100% operativo y probado de extremo a extremo con servicios periféricos simulados (mocks).
+[x] Resultado: El "chasis" de la arquitectura está 100% operativo y probado de extremo a extremo con servicios periféricos simulados (mocks).
 
 Capacidades a Validar:
 
-[ ] 1.1 Construcción del gateway-service real: La interfaz de usuario puede enviar tareas reales al event-bus.
+[x] 1.1 Construcción del gateway-service real: La interfaz de usuario puede enviar tareas reales al event-bus.
 
-[ ] 1.2 Construcción del orchestrator-service real: El cerebro implementa la Máquina de Estados (del Hito 0) y su BBDD. Reacciona a eventos y publica nuevos eventos.
+[x] 1.2 Construcción del orchestrator-service real: El cerebro implementa la Máquina de Estados (del Hito 0) y su BBDD. Reacciona a eventos y publica nuevos eventos.
 
-[ ] 2.1 Construcción del mock-herrero-adapter-service: Un simulador que escucha eventos tarea.generar_plan y responde con resultado.plan_generado falsos, adhiriéndose al Contrato (Hito 0).
+[x] 2.1 Construcción del mock-herrero-adapter-service: Un simulador que escucha eventos tarea.generar_plan y responde con resultado.plan_generado falsos, adhiriéndose al Contrato (Hito 0).
 
-[ ] 2.2 Construcción del mock-sandbox-service: Un simulador que escucha tarea.probar_integracion y responde con resultado.integracion_finalizada falsos.
+[x] 2.2 Construcción del mock-sandbox-service: Un simulador que escucha tarea.probar_integracion y responde con resultado.integracion_finalizada falsos.
 
-[ ] 3.0 Prueba de Integración Simulada: Se valida el "Happy Path" y el "Feedback Loop" (simulando un exito: false) usando solo los mocks.
+[x] 3.0 Prueba de Integración Simulada: Se valida el "Happy Path" y el "Feedback Loop" (simulando un exito: false) usando solo los mocks.
 
 Estado al Completar: El sistema nervioso (event-bus) y el cerebro (orchestrator) están validados. El sistema funciona en un mundo predecible.
 

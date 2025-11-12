@@ -1,1 +1,13 @@
-{"name": "sandbox-service", "version": "0.0.1"}
+{
+  "name": "sandbox-service",
+  "version": "0.0.1",
+  "description": "Simulador (Mock) del Sandbox. Finge ejecutar pruebas de integración.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "uuid": "^9.0.1"
+  }
+}
