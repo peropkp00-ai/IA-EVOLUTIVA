@@ -1,8 +1,6 @@
 name: Docker CI for Monorepo
 
 on:
-  schedule:
-    - cron: '30 10 * * *'
   push:
     branches: [ "main" ]
     paths:
@@ -59,8 +57,9 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09
         with:
-          # El contexto ahora apunta al directorio de cada servicio
-          context: ./services/${{ matrix.service }}
+          # El contexto se mantiene en la raíz, pero especificamos la ruta exacta del Dockerfile.
+          context: .
+          file: ./services/${{ matrix.service }}/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
