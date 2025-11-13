@@ -94,8 +94,17 @@ async function handleMessage(msg) {
                     } else if (analysisResult.analysis === 'CAPACITY_GAP') {
                         // Flujo del Hito 3: Brecha de capacidad detectada.
                         await updateTaskState(taskId, 'BRECHA_CAPACIDAD_DETECTADA');
-                        console.log(`[${taskId}] Brecha de capacidad detectada. Habilidad faltante: '${analysisResult.missingSkill}'`);
-                        // En el futuro, aquí se iniciaría el plan de desarrollo.
+                        const habilidadFaltante = analysisResult.missingSkill;
+                        console.log(`[${taskId}] Brecha de capacidad detectada. Habilidad faltante: '${habilidadFaltante}'`);
+
+                        // Flujo del Hito 4: Generar plan de desarrollo.
+                        const planDeDesarrollo = await generarPlanDeDesarrollo(habilidadFaltante);
+                        await updateTaskState(taskId, 'ESPERANDO_APROBACION_PLAN_DESARROLLO');
+
+                        publishEvent(RESULTADOS_TOPIC, 'resultado.plan_desarrollo_generado', metadata, {
+                            plan: planDeDesarrollo
+                        });
+                        console.log(`[${taskId}] Plan de desarrollo generado. Esperando aprobación del usuario.`);
                     }
 
                 } catch (error) {
@@ -228,6 +237,45 @@ function executeSkill(skillId, params) {
         console.log(`Resultado de la habilidad ${skillId}: ${result}`);
         resolve(result);
     });
+}
+
+function generarPlanDeDesarrollo(habilidadFaltante) {
+    // Simulación de generación de plan para el Hito 4.
+    // En el futuro, esto sería una llamada a un LLM.
+    console.log(`Generando plan de desarrollo para la habilidad: ${habilidadFaltante}...`);
+
+    const plan = {
+        habilidad: habilidadFaltante,
+        pasos: [
+            {
+                paso: 1,
+                descripcion: "Definir la especificación de la nueva habilidad.",
+                artefacto: "documento_especificacion.md"
+            },
+            {
+                paso: 2,
+                descripcion: "Escribir el código de la función de la habilidad.",
+                artefacto: "skill_code.js"
+            },
+            {
+                paso: 3,
+                descripcion: "Crear pruebas unitarias para la nueva habilidad.",
+                artefacto: "skill_test.js"
+            },
+            {
+                paso: 4,
+                descripcion: "Validar las pruebas en el sandbox.",
+                artefacto: "reporte_de_pruebas.json"
+            },
+            {
+                paso: 5,
+                descripcion: "Registrar la nueva habilidad en el skill-registry.",
+                artefacto: "skill-registry.json"
+            }
+        ]
+    };
+
+    return Promise.resolve(plan);
 }
 
 
