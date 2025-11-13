@@ -1,6 +1,6 @@
 # Tareas de Verificación Pendientes Post-Solución de Docker
 
-Este documento describe los pasos necesarios para probar y validar las implementaciones de los **Hitos 2, 3, 4 y 5**, que se desarrollaron "a ciegas" debido a la inactividad del entorno de Docker.
+Este documento describe los pasos necesarios para probar y validar las implementaciones de los **Hitos 2, 3, 4 y 5**, que se desarrollaron "a ciegas".
 
 Una vez que el comando `sg docker -c "docker-compose up"` funcione correctamente, se deben seguir los siguientes casos de prueba en orden.
 
@@ -28,15 +28,11 @@ Una vez que el comando `sg docker -c "docker-compose up"` funcione correctamente
     *   **Verificar Logs (Orchestrator):** La tarea debe llegar al estado `ESPERANDO_APROBACION_PLAN_DESARROLLO` y se debe publicar el evento `resultado.plan_desarrollo_generado`. Anotar el `taskId` de los logs.
 
 2.  **Aprobación y Desarrollo (Hito 5):**
-    *   **Simular Aprobación:** Es necesario inyectar un evento manualmente en RabbitMQ.
-        *   Acceder a la interfaz de gestión de RabbitMQ en `http://localhost:15672`.
-        *   Navegar a la cola `topico.tareas` y publicar un nuevo mensaje.
-        *   El mensaje debe ser un JSON que simule el evento `tarea.aprobar_plan_desarrollo`, usando el `taskId` del paso anterior. Ejemplo del payload: `{"nombreEvento": "tarea.aprobar_plan_desarrollo"}`. No olvidar los metadatos.
+    *   **Simular Aprobación:** Inyectar un evento `tarea.aprobar_plan_desarrollo` en la cola `topico.tareas` de RabbitMQ, usando el `taskId` anterior.
     *   **Verificar Logs (Orchestrator):** El estado debe cambiar a `DESARROLLANDO_HABILIDAD` y se debe publicar el evento `tarea.generar_plan`.
-    *   **Verificar Logs (Herrero Adapter):** El servicio debe registrar que ha recibido `tarea.generar_plan` e iniciado la simulación.
+    *   **Verificar Logs (Herrero Adapter):** El servicio debe recibir `tarea.generar_plan`.
     *   **Esperar 10 segundos.**
-    *   **Verificar Logs (Herrero Adapter):** El servicio debe publicar `resultado.pr_generada` con una URL falsa.
-    *   **Verificar Logs (Orchestrator):** El estado de la tarea debe cambiar a `PROBANDO_INTEGRACION`.
+    *   **Verificar Logs (Orchestrator):** El estado de la tarea debe cambiar a `PROBANDO_INTEGRACION` tras recibir `resultado.pr_generada`.
 
 ---
 
@@ -47,7 +43,3 @@ Una vez que el comando `sg docker -c "docker-compose up"` funcione correctamente
 **Pasos:**
 1.  **Enviar Tarea:** Enviar el `prompt`: `"cuál es el clima de hoy"`.
 2.  **Verificar Logs:** La tarea debe transicionar a `FALLIDA_LOGICA`.
-
----
-
-Si todas estas verificaciones son exitosas, se podrá considerar que las implementaciones "a ciegas" son funcionales.

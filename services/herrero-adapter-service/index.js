@@ -41,14 +41,12 @@ async function handleMessage(msg) {
         const { nombreEvento } = payload;
 
         if (nombreEvento !== 'tarea.generar_plan') {
-            // Este servicio solo reacciona a 'tarea.generar_plan'
             return;
         }
 
         console.log(`[${taskId}] Evento 'tarea.generar_plan' recibido.`);
         console.log(`[${taskId}] Simulando interacción con la API del Herrero...`);
 
-        // Simulación de una llamada a API asíncrona que tarda 10 segundos
         setTimeout(() => {
             const fakePullRequestUrl = `https://github.com/example/repo/pull/${Math.floor(Math.random() * 1000)}`;
 
@@ -75,7 +73,6 @@ async function connectToRabbitMQ() {
 
         console.log('Herrero Adapter Service conectado a RabbitMQ');
 
-        // Empezar a consumir mensajes de la cola de tareas
         channel.consume(TAREAS_TOPIC, handleMessage, { noAck: true });
 
     } catch (error) {
