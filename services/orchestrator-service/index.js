@@ -122,11 +122,24 @@ async function handleMessage(msg) {
                 // Aquí notificaríamos al gateway con el resultado final.
                 break;
 
-            // El flujo original de PLANIFICANDO queda inactivo por ahora.
-            // case 'resultado.plan_generado':
-            //     await updateTaskState(taskId, 'ESPERANDO_APROBACION_PLAN');
-            //     console.log(`[${taskId}] Plan generado. Esperando aprobación.`);
-            //     break;
+            case 'tarea.aprobar_plan_desarrollo':
+                // Hito 5: El usuario aprueba el plan, comenzamos el desarrollo.
+                await updateTaskState(taskId, 'DESARROLLANDO_HABILIDAD');
+                console.log(`[${taskId}] Plan de desarrollo aprobado. Delegando al Herrero...`);
+                // El `payload` de este evento debería contener el plan, pero aquí lo simplificamos.
+                publishEvent(TAREAS_TOPIC, 'tarea.generar_plan', metadata, {
+                    prompt: "Generar la habilidad 'multiplicar' según el plan." // Prompt técnico para el Herrero
+                });
+                break;
+
+            case 'resultado.pr_generada':
+                // Hito 5: El Herrero ha terminado y ha generado una PR.
+                // El siguiente paso sería el Hito 6: Probar en el Sandbox.
+                await updateTaskState(taskId, 'PROBANDO_INTEGRACION');
+                console.log(`[${taskId}] Pull Request generada: ${payload.pullRequestUrl}. Delegando al Sandbox...`);
+                // Aquí publicaríamos el evento 'tarea.probar_integracion'
+                break;
+
         }
     } catch (error) {
         console.error('Error procesando mensaje:', error.message);
