@@ -1,6 +1,18 @@
 const amqplib = require('amqplib');
 const sqlite3 = require('sqlite3').verbose();
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+
+// --- Registro de Habilidades ---
+let skillRegistry = [];
+try {
+    const rawData = fs.readFileSync('./skill-registry.json', 'utf8');
+    skillRegistry = JSON.parse(rawData);
+    console.log('Registro de habilidades cargado exitosamente.');
+} catch (error) {
+    console.error('Error cargando el registro de habilidades:', error.message);
+    process.exit(1); // Salir si no se pueden cargar las habilidades
+}
 
 // --- Configuración ---
 const RABBITMQ_URL = 'amqp://event-bus';
@@ -64,18 +76,38 @@ async function handleMessage(msg) {
         switch (nombreEvento) {
             case 'tarea.crear':
                 await createTask(taskId, payload);
-                await updateTaskState(taskId, 'PLANIFICANDO');
-                publishEvent(TAREAS_TOPIC, 'tarea.generar_plan', metadata, { prompt: payload.prompt });
+                await updateTaskState(taskId, 'ANALIZANDO_PROMPT');
+
+                try {
+                    const { skillId, params } = await analizarPrompt(payload.prompt);
+                    await updateTaskState(taskId, 'EJECUTANDO_HABILIDAD');
+
+                    const result = await executeSkill(skillId, params);
+
+                    // Publicamos el resultado para nosotros mismos para cerrar el ciclo
+                    publishEvent(RESULTADOS_TOPIC, 'resultado.habilidad_ejecutada', metadata, {
+                        resultado: result,
+                        promptOriginal: payload.prompt
+                    });
+                } catch (error) {
+                    console.error(`[${taskId}] Error en el ciclo de ejecución directa:`, error.message);
+                    await updateTaskState(taskId, 'FALLIDA_LOGICA');
+                    // Aquí se podría notificar al gateway sobre el fallo
+                }
                 break;
 
-            case 'resultado.plan_generado':
-                await updateTaskState(taskId, 'ESPERANDO_APROBACION_PLAN');
-                // En una implementación real, notificaríamos al gateway. Aquí, simplemente esperamos.
-                console.log(`[${taskId}] Plan generado. Esperando aprobación.`);
+            case 'resultado.habilidad_ejecutada':
+                // La habilidad se ejecutó con éxito, ahora completamos la tarea.
+                await updateTaskState(taskId, 'COMPLETADA');
+                console.log(`[${taskId}] Tarea completada con resultado: ${payload.resultado}`);
+                // Aquí notificaríamos al gateway con el resultado final.
                 break;
 
-            // Aquí se añadirían los manejadores para el resto de eventos del flujo
-            // ej. 'tarea.aprobar_plan', 'resultado.pr_generada', etc.
+            // El flujo original de PLANIFICANDO queda inactivo por ahora.
+            // case 'resultado.plan_generado':
+            //     await updateTaskState(taskId, 'ESPERANDO_APROBACION_PLAN');
+            //     console.log(`[${taskId}] Plan generado. Esperando aprobación.`);
+            //     break;
         }
     } catch (error) {
         console.error('Error procesando mensaje:', error.message);
@@ -95,6 +127,34 @@ function createTask(taskId, payload) {
                 resolve();
             }
         );
+    });
+}
+
+function analizarPrompt(prompt) {
+    // Análisis muy simple y rígido, solo para la PoC del Hito 2.
+    // Busca patrones como "cuánto es X + Y" o "suma X y Y".
+    return new Promise((resolve, reject) => {
+        prompt = prompt.toLowerCase();
+
+        // Regex para "cuánto es <num> + <num>"
+        const regexSuma1 = /cuánto es (\d+) \+ (\d+)/;
+        // Regex para "suma <num> y <num>"
+        const regexSuma2 = /suma (\d+) y (\d+)/;
+
+        let match = prompt.match(regexSuma1);
+        if (!match) {
+            match = prompt.match(regexSuma2);
+        }
+
+        if (match) {
+            const params = {
+                a: parseInt(match[1], 10),
+                b: parseInt(match[2], 10)
+            };
+            resolve({ skillId: 'sumar', params });
+        } else {
+            reject(new Error("No se pudo identificar una habilidad o los parámetros en el prompt."));
+        }
     });
 }
 
@@ -134,6 +194,26 @@ function publishEvent(topic, nombreEvento, originalMetadata, payload) {
     channel.sendToQueue(topic, Buffer.from(JSON.stringify(event)));
     console.log(`[${taskId}] Evento publicado: ${nombreEvento}`);
 }
+
+function executeSkill(skillId, params) {
+    // Esta función ejecutará la habilidad solicitada.
+    // Por ahora, solo tenemos la lógica para 'sumar'.
+    return new Promise((resolve, reject) => {
+        if (skillId !== 'sumar') {
+            return reject(new Error(`Habilidad desconocida: ${skillId}`));
+        }
+
+        const { a, b } = params;
+        if (typeof a !== 'number' || typeof b !== 'number') {
+            return reject(new Error('Parámetros inválidos para la habilidad sumar. Se esperan dos números.'));
+        }
+
+        const result = a + b;
+        console.log(`Resultado de la habilidad ${skillId}: ${result}`);
+        resolve(result);
+    });
+}
+
 
 // --- Iniciar Servicio ---
 connectToRabbitMQ();
