@@ -1,13 +1,14 @@
 {
   "name": "herrero-adapter-service",
   "version": "0.0.1",
-  "description": "Simulador (Mock) del Herrero Adapter. Finge ser el agente de IA para pruebas de flujo.",
+  "description": "Traduce eventos del orquestador en llamadas a la API del agente de codificación (Herrero).",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
+    "axios": "^1.6.0",
     "uuid": "^9.0.1"
   }
 }
