@@ -17,7 +17,7 @@ try {
 // --- Configuración ---
 const RABBITMQ_URL = 'amqp://event-bus';
 const TAREAS_TOPIC = 'topico.tareas';
-const RESULTADOS_TOPIC = 'topico.resultados'; // Asumimos que también escucharemos resultados
+const RESULTADOS_TOPIC = 'topico.resultados';
 const DB_PATH = './orchestrator.db';
 
 // --- Base de Datos ---
@@ -26,7 +26,6 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
         console.error('Error abriendo la base de datos:', err.message);
     } else {
         console.log('Conectado a la base de datos de estado.');
-        // Crear la tabla si no existe
         db.run(`CREATE TABLE IF NOT EXISTS tasks (
             taskId TEXT PRIMARY KEY,
             currentState TEXT NOT NULL,
@@ -45,13 +44,11 @@ async function connectToRabbitMQ() {
         const connection = await amqplib.connect(RABBITMQ_URL);
         channel = await connection.createChannel();
 
-        // Asegurar que las colas existen
         await channel.assertQueue(TAREAS_TOPIC, { durable: true });
         await channel.assertQueue(RESULTADOS_TOPIC, { durable: true });
 
         console.log('Orchestrator Service conectado a RabbitMQ');
 
-        // Empezar a consumir mensajes de ambas colas
         channel.consume(TAREAS_TOPIC, handleMessage, { noAck: true });
         channel.consume(RESULTADOS_TOPIC, handleMessage, { noAck: true });
 
@@ -82,7 +79,6 @@ async function handleMessage(msg) {
                     const analysisResult = await analizarPrompt(payload.prompt);
 
                     if (analysisResult.analysis === 'SKILL_FOUND') {
-                        // Flujo del Hito 2: Habilidad encontrada, proceder a ejecutar.
                         await updateTaskState(taskId, 'EJECUTANDO_HABILIDAD');
                         const result = await executeSkill(analysisResult.skillId, analysisResult.params);
 
@@ -92,12 +88,10 @@ async function handleMessage(msg) {
                         });
 
                     } else if (analysisResult.analysis === 'CAPACITY_GAP') {
-                        // Flujo del Hito 3: Brecha de capacidad detectada.
                         await updateTaskState(taskId, 'BRECHA_CAPACIDAD_DETECTADA');
                         const habilidadFaltante = analysisResult.missingSkill;
                         console.log(`[${taskId}] Brecha de capacidad detectada. Habilidad faltante: '${habilidadFaltante}'`);
 
-                        // Flujo del Hito 4: Generar plan de desarrollo.
                         const planDeDesarrollo = await generarPlanDeDesarrollo(habilidadFaltante);
                         await updateTaskState(taskId, 'ESPERANDO_APROBACION_PLAN_DESARROLLO');
 
@@ -108,38 +102,28 @@ async function handleMessage(msg) {
                     }
 
                 } catch (error) {
-                    // El prompt no fue reconocido.
                     console.error(`[${taskId}] Error en el análisis del prompt:`, error.message);
                     await updateTaskState(taskId, 'FALLIDA_LOGICA');
-                    // Aquí se podría notificar al gateway sobre el fallo
                 }
                 break;
 
             case 'resultado.habilidad_ejecutada':
-                // La habilidad se ejecutó con éxito, ahora completamos la tarea.
                 await updateTaskState(taskId, 'COMPLETADA');
                 console.log(`[${taskId}] Tarea completada con resultado: ${payload.resultado}`);
-                // Aquí notificaríamos al gateway con el resultado final.
                 break;
 
             case 'tarea.aprobar_plan_desarrollo':
-                // Hito 5: El usuario aprueba el plan, comenzamos el desarrollo.
                 await updateTaskState(taskId, 'DESARROLLANDO_HABILIDAD');
                 console.log(`[${taskId}] Plan de desarrollo aprobado. Delegando al Herrero...`);
-                // El `payload` de este evento debería contener el plan, pero aquí lo simplificamos.
                 publishEvent(TAREAS_TOPIC, 'tarea.generar_plan', metadata, {
-                    prompt: "Generar la habilidad 'multiplicar' según el plan." // Prompt técnico para el Herrero
+                    prompt: "Generar la habilidad 'multiplicar' según el plan."
                 });
                 break;
 
             case 'resultado.pr_generada':
-                // Hito 5: El Herrero ha terminado y ha generado una PR.
-                // El siguiente paso sería el Hito 6: Probar en el Sandbox.
                 await updateTaskState(taskId, 'PROBANDO_INTEGRACION');
                 console.log(`[${taskId}] Pull Request generada: ${payload.pullRequestUrl}. Delegando al Sandbox...`);
-                // Aquí publicaríamos el evento 'tarea.probar_integracion'
                 break;
-
         }
     } catch (error) {
         console.error('Error procesando mensaje:', error.message);
@@ -163,14 +147,11 @@ function createTask(taskId, payload) {
 }
 
 function analizarPrompt(prompt) {
-    // Análisis simple para Hito 3. Identifica habilidad existente o brecha de capacidad.
     return new Promise((resolve, reject) => {
         prompt = prompt.toLowerCase();
 
-        // --- 1. Buscar habilidades existentes (sumar) ---
         const regexSuma1 = /cuánto es (\d+) \+ (\d+)/;
         const regexSuma2 = /suma (\d+) y (\d+)/;
-
         let matchSuma = prompt.match(regexSuma1) || prompt.match(regexSuma2);
 
         if (matchSuma) {
@@ -178,21 +159,17 @@ function analizarPrompt(prompt) {
                 a: parseInt(matchSuma[1], 10),
                 b: parseInt(matchSuma[2], 10)
             };
-            // Encontramos una habilidad que SÍ tenemos
             return resolve({ analysis: 'SKILL_FOUND', skillId: 'sumar', params });
         }
 
-        // --- 2. Buscar brechas de capacidad conocidas (multiplicar) ---
         const regexMult1 = /multiplica (\d+) por (\d+)/;
         let matchMult = prompt.match(regexMult1);
 
         if (matchMult) {
-            // Encontramos una habilidad que NO tenemos
             return resolve({ analysis: 'CAPACITY_GAP', missingSkill: 'multiplicar' });
         }
 
-        // --- 3. Si no se reconoce nada ---
-        reject(new Error("Prompt no reconocido. No se pudo identificar ni una habilidad existente ni una brecha de capacidad conocida."));
+        reject(new Error("Prompt no reconocido."));
     });
 }
 
@@ -234,8 +211,6 @@ function publishEvent(topic, nombreEvento, originalMetadata, payload) {
 }
 
 function executeSkill(skillId, params) {
-    // Esta función ejecutará la habilidad solicitada.
-    // Por ahora, solo tenemos la lógica para 'sumar'.
     return new Promise((resolve, reject) => {
         if (skillId !== 'sumar') {
             return reject(new Error(`Habilidad desconocida: ${skillId}`));
@@ -243,7 +218,7 @@ function executeSkill(skillId, params) {
 
         const { a, b } = params;
         if (typeof a !== 'number' || typeof b !== 'number') {
-            return reject(new Error('Parámetros inválidos para la habilidad sumar. Se esperan dos números.'));
+            return reject(new Error('Parámetros inválidos para la habilidad sumar.'));
         }
 
         const result = a + b;
@@ -253,44 +228,21 @@ function executeSkill(skillId, params) {
 }
 
 function generarPlanDeDesarrollo(habilidadFaltante) {
-    // Simulación de generación de plan para el Hito 4.
-    // En el futuro, esto sería una llamada a un LLM.
     console.log(`Generando plan de desarrollo para la habilidad: ${habilidadFaltante}...`);
 
     const plan = {
         habilidad: habilidadFaltante,
         pasos: [
-            {
-                paso: 1,
-                descripcion: "Definir la especificación de la nueva habilidad.",
-                artefacto: "documento_especificacion.md"
-            },
-            {
-                paso: 2,
-                descripcion: "Escribir el código de la función de la habilidad.",
-                artefacto: "skill_code.js"
-            },
-            {
-                paso: 3,
-                descripcion: "Crear pruebas unitarias para la nueva habilidad.",
-                artefacto: "skill_test.js"
-            },
-            {
-                paso: 4,
-                descripcion: "Validar las pruebas en el sandbox.",
-                artefacto: "reporte_de_pruebas.json"
-            },
-            {
-                paso: 5,
-                descripcion: "Registrar la nueva habilidad en el skill-registry.",
-                artefacto: "skill-registry.json"
-            }
+            { paso: 1, descripcion: "Definir la especificación de la habilidad." },
+            { paso: 2, descripcion: "Escribir el código de la función." },
+            { paso: 3, descripcion: "Crear pruebas unitarias." },
+            { paso: 4, descripcion: "Validar las pruebas en el sandbox." },
+            { paso: 5, descripcion: "Registrar la nueva habilidad." }
         ]
     };
 
     return Promise.resolve(plan);
 }
-
 
 // --- Iniciar Servicio ---
 connectToRabbitMQ();

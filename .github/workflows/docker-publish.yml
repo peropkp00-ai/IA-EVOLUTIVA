@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'services/**' # Solo ejecutar si hay cambios en los servicios
+      - 'services/**'
   pull_request:
     branches: [ "main" ]
     paths:
@@ -12,7 +12,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # El nombre de la imagen se construirá dinámicamente
 
 jobs:
   build-and-publish:
@@ -50,14 +49,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934
         with:
-          # Construir un nombre de imagen único para cada servicio
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}
 
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09
         with:
-          # El contexto se mantiene en la raíz, pero especificamos la ruta exacta del Dockerfile.
           context: .
           file: ./services/${{ matrix.service }}/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
@@ -65,7 +62,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # Nota: La firma con Cosign se ha omitido por simplicidad en esta refactorización,
-      # ya que requeriría una lógica más compleja para manejar los múltiples artefactos.
-      # Se puede reintroducir en el futuro si es necesario.
