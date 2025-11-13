@@ -79,18 +79,28 @@ async function handleMessage(msg) {
                 await updateTaskState(taskId, 'ANALIZANDO_PROMPT');
 
                 try {
-                    const { skillId, params } = await analizarPrompt(payload.prompt);
-                    await updateTaskState(taskId, 'EJECUTANDO_HABILIDAD');
+                    const analysisResult = await analizarPrompt(payload.prompt);
 
-                    const result = await executeSkill(skillId, params);
+                    if (analysisResult.analysis === 'SKILL_FOUND') {
+                        // Flujo del Hito 2: Habilidad encontrada, proceder a ejecutar.
+                        await updateTaskState(taskId, 'EJECUTANDO_HABILIDAD');
+                        const result = await executeSkill(analysisResult.skillId, analysisResult.params);
 
-                    // Publicamos el resultado para nosotros mismos para cerrar el ciclo
-                    publishEvent(RESULTADOS_TOPIC, 'resultado.habilidad_ejecutada', metadata, {
-                        resultado: result,
-                        promptOriginal: payload.prompt
-                    });
+                        publishEvent(RESULTADOS_TOPIC, 'resultado.habilidad_ejecutada', metadata, {
+                            resultado: result,
+                            promptOriginal: payload.prompt
+                        });
+
+                    } else if (analysisResult.analysis === 'CAPACITY_GAP') {
+                        // Flujo del Hito 3: Brecha de capacidad detectada.
+                        await updateTaskState(taskId, 'BRECHA_CAPACIDAD_DETECTADA');
+                        console.log(`[${taskId}] Brecha de capacidad detectada. Habilidad faltante: '${analysisResult.missingSkill}'`);
+                        // En el futuro, aquí se iniciaría el plan de desarrollo.
+                    }
+
                 } catch (error) {
-                    console.error(`[${taskId}] Error en el ciclo de ejecución directa:`, error.message);
+                    // El prompt no fue reconocido.
+                    console.error(`[${taskId}] Error en el análisis del prompt:`, error.message);
                     await updateTaskState(taskId, 'FALLIDA_LOGICA');
                     // Aquí se podría notificar al gateway sobre el fallo
                 }
@@ -131,30 +141,36 @@ function createTask(taskId, payload) {
 }
 
 function analizarPrompt(prompt) {
-    // Análisis muy simple y rígido, solo para la PoC del Hito 2.
-    // Busca patrones como "cuánto es X + Y" o "suma X y Y".
+    // Análisis simple para Hito 3. Identifica habilidad existente o brecha de capacidad.
     return new Promise((resolve, reject) => {
         prompt = prompt.toLowerCase();
 
-        // Regex para "cuánto es <num> + <num>"
+        // --- 1. Buscar habilidades existentes (sumar) ---
         const regexSuma1 = /cuánto es (\d+) \+ (\d+)/;
-        // Regex para "suma <num> y <num>"
         const regexSuma2 = /suma (\d+) y (\d+)/;
 
-        let match = prompt.match(regexSuma1);
-        if (!match) {
-            match = prompt.match(regexSuma2);
+        let matchSuma = prompt.match(regexSuma1) || prompt.match(regexSuma2);
+
+        if (matchSuma) {
+            const params = {
+                a: parseInt(matchSuma[1], 10),
+                b: parseInt(matchSuma[2], 10)
+            };
+            // Encontramos una habilidad que SÍ tenemos
+            return resolve({ analysis: 'SKILL_FOUND', skillId: 'sumar', params });
         }
 
-        if (match) {
-            const params = {
-                a: parseInt(match[1], 10),
-                b: parseInt(match[2], 10)
-            };
-            resolve({ skillId: 'sumar', params });
-        } else {
-            reject(new Error("No se pudo identificar una habilidad o los parámetros en el prompt."));
+        // --- 2. Buscar brechas de capacidad conocidas (multiplicar) ---
+        const regexMult1 = /multiplica (\d+) por (\d+)/;
+        let matchMult = prompt.match(regexMult1);
+
+        if (matchMult) {
+            // Encontramos una habilidad que NO tenemos
+            return resolve({ analysis: 'CAPACITY_GAP', missingSkill: 'multiplicar' });
         }
+
+        // --- 3. Si no se reconoce nada ---
+        reject(new Error("Prompt no reconocido. No se pudo identificar ni una habilidad existente ni una brecha de capacidad conocida."));
     });
 }
 
