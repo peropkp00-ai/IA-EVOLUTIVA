@@ -6,31 +6,29 @@ const RABBITMQ_URL = 'amqp://event-bus';
 const TAREAS_TOPIC = 'topico.tareas';
 const RESULTADOS_TOPIC = 'topico.resultados';
 
+// --- Conexión a RabbitMQ ---
 let channel = null;
 
-// --- Funciones de Publicación de Eventos ---
-function publishEvent(topic, nombreEvento, originalMetadata, payload) {
-    const { taskId } = originalMetadata;
-    const newTraceId = uuidv4();
+async function connectToRabbitMQ() {
+    try {
+        const connection = await amqplib.connect(RABBITMQ_URL);
+        channel = await connection.createChannel();
 
-    const event = {
-        metadata: {
-            taskId,
-            traceId: newTraceId,
-            timestamp: new Date().toISOString(),
-            originator: 'herrero-adapter-service'
-        },
-        payload: {
-            nombreEvento,
-            ...payload
-        }
-    };
+        await channel.assertQueue(TAREAS_TOPIC, { durable: true });
+        await channel.assertQueue(RESULTADOS_TOPIC, { durable: true });
 
-    channel.sendToQueue(topic, Buffer.from(JSON.stringify(event)));
-    console.log(`[${taskId}] Evento publicado: ${nombreEvento}`);
+        console.log('Mock Herrero Adapter conectado a RabbitMQ');
+
+        // Empezar a consumir mensajes de la cola de tareas
+        channel.consume(TAREAS_TOPIC, handleMessage, { noAck: true });
+
+    } catch (error) {
+        console.error('Error conectando a RabbitMQ:', error.message);
+        setTimeout(connectToRabbitMQ, 5000);
+    }
 }
 
-// --- Lógica del Servicio ---
+// --- Lógica de Simulación ---
 async function handleMessage(msg) {
     if (msg === null) return;
 
@@ -40,45 +38,53 @@ async function handleMessage(msg) {
         const { taskId } = metadata;
         const { nombreEvento } = payload;
 
-        if (nombreEvento !== 'tarea.generar_plan') {
-            return;
+        // Solo reacciona a los eventos que le conciernen
+        if (nombreEvento === 'tarea.generar_plan') {
+            console.log(`[${taskId}] Recibido ${nombreEvento}. Simulando generación de plan...`);
+
+            // Simular un retraso de 5 segundos
+            setTimeout(() => {
+                const planId = uuidv4();
+                const planFalso = {
+                    pasos: [
+                        { "accion": "paso_1_falso", "descripcion": "Este es el primer paso simulado." },
+                        { "accion": "paso_2_falso", "descripcion": "Este es el segundo paso simulado." }
+                    ]
+                };
+
+                // Publicar el resultado falso
+                publishEvent(RESULTADOS_TOPIC, 'resultado.plan_generado', metadata, { planId, plan: planFalso });
+                console.log(`[${taskId}] Plan simulado generado y publicado.`);
+            }, 5000);
         }
 
-        console.log(`[${taskId}] Evento 'tarea.generar_plan' recibido.`);
-        console.log(`[${taskId}] Simulando interacción con la API del Herrero...`);
-
-        setTimeout(() => {
-            const fakePullRequestUrl = `https://github.com/example/repo/pull/${Math.floor(Math.random() * 1000)}`;
-
-            console.log(`[${taskId}] Simulación completada. Publicando 'resultado.pr_generada'.`);
-
-            publishEvent(RESULTADOS_TOPIC, 'resultado.pr_generada', metadata, {
-                pullRequestUrl: fakePullRequestUrl
-            });
-        }, 10000); // 10 segundos de retraso
+        // Aquí se añadirían más simulaciones, como para 'tarea.aprobar_plan'
 
     } catch (error) {
-        console.error('Error procesando mensaje:', error.message);
+        console.error('Error procesando mensaje en Mock Herrero:', error.message);
     }
 }
 
-// --- Conexión a RabbitMQ ---
-async function connectToRabbitMQ() {
-    try {
-        const connection = await amqplib.connect(RABBITMQ_URL);
-        channel = await connection.createChannel();
+// --- Función de Publicación ---
+function publishEvent(topic, nombreEvento, originalMetadata, payload) {
+    const { taskId } = originalMetadata;
+    const newTraceId = uuidv4();
 
-        await channel.assertQueue(TAREAS_TOPIC, { durable: true });
-        await channel.assertQueue(RESULTADOS_TOPIC, { durable: true });
+    const event = {
+        metadata: {
+            taskId,
+            traceId: newTraceId,
+            timestamp: new Date().toISOString(),
+            originator: 'mock-herrero-adapter-service'
+        },
+        payload: {
+            nombreEvento,
+            ...payload
+        }
+    };
 
-        console.log('Herrero Adapter Service conectado a RabbitMQ');
-
-        channel.consume(TAREAS_TOPIC, handleMessage, { noAck: true });
-
-    } catch (error) {
-        console.error('Error conectando a RabbitMQ:', error.message);
-        setTimeout(connectToRabbitMQ, 5000);
-    }
+    channel.sendToQueue(topic, Buffer.from(JSON.stringify(event)));
+    console.log(`[${taskId}] Evento simulado publicado: ${nombreEvento}`);
 }
 
 // --- Iniciar Servicio ---
