@@ -4,7 +4,8 @@
   "description": "El cerebro del sistema. Gestiona el ciclo de vida de las tareas como una máquina de estados.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
