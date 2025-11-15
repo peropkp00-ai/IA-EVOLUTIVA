@@ -4,7 +4,8 @@
   "description": "Simulador (Mock) del Herrero Adapter. Finge ser el agente de IA para pruebas de flujo.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "amqplib": "^0.10.3",

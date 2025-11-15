@@ -4,7 +4,8 @@
   "description": "Simulador (Mock) del Sandbox. Finge ejecutar pruebas de integración.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
