@@ -4,7 +4,8 @@
   "description": "El único punto de entrada al sistema. Gestiona la API y traduce acciones de usuario a eventos.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
