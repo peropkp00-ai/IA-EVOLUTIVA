@@ -1,4 +1,3 @@
-
 const express = require('express');
 const http = require('http');
 const config = require('./src/config');
@@ -19,3 +18,4 @@ app.get('/', (req, res) => {
 server.listen(config.port, () => {
     logger.info(`Jules Service with WebSocket listening at http://localhost:${config.port}`);
 });
+
