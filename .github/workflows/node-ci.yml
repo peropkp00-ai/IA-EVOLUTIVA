@@ -21,6 +21,8 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'services/${{ matrix.service }}/package-lock.json'
 
     - name: Install Dependencies for ${{ matrix.service }}
       run: npm install
