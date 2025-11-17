@@ -1,15 +1,13 @@
 {
   "name": "herrero-adapter-service",
-  "version": "0.1.0",
-  "description": "Un adaptador que conecta el event-bus con la API WebSocket de jules-service.",
+  "version": "0.0.1",
+  "description": "Simulador (Mock) del Herrero Adapter. Finge ser el agente de IA para pruebas de flujo.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "echo \"No tests specified\" && exit 0"
+    "start": "node index.js"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
-    "uuid": "^9.0.1",
-    "ws": "^8.17.1"
+    "uuid": "^9.0.1"
   }
 }

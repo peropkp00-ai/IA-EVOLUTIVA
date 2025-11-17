@@ -137,3 +137,8 @@ function publishEvent(topic, nombreEvento, originalMetadata, payload) {
 
 // --- Iniciar Servicio ---
 connectToRabbitMQ();
+
+// Exportar para pruebas
+module.exports = {
+  handleMessage,
+};
