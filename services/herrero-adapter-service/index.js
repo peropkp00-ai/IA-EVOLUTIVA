@@ -1,90 +1,114 @@
 const amqplib = require('amqplib');
+const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 
 // --- Configuración ---
 const RABBITMQ_URL = 'amqp://event-bus';
 const TAREAS_TOPIC = 'topico.tareas';
 const RESULTADOS_TOPIC = 'topico.resultados';
+const JULES_SERVICE_URL = 'ws://jules-service:8080'; // Asumiendo puerto 8080
+
+let rabbitChannel = null;
 
 // --- Conexión a RabbitMQ ---
-let channel = null;
-
 async function connectToRabbitMQ() {
     try {
         const connection = await amqplib.connect(RABBITMQ_URL);
-        channel = await connection.createChannel();
-
-        await channel.assertQueue(TAREAS_TOPIC, { durable: true });
-        await channel.assertQueue(RESULTADOS_TOPIC, { durable: true });
-
-        console.log('Mock Herrero Adapter conectado a RabbitMQ');
-
-        // Empezar a consumir mensajes de la cola de tareas
-        channel.consume(TAREAS_TOPIC, handleMessage, { noAck: true });
-
+        rabbitChannel = await connection.createChannel();
+        await rabbitChannel.assertQueue(TAREAS_TOPIC, { durable: true });
+        console.log('Herrero Adapter conectado a RabbitMQ');
+        rabbitChannel.consume(TAREAS_TOPIC, handleRabbitMessage, { noAck: true });
     } catch (error) {
         console.error('Error conectando a RabbitMQ:', error.message);
         setTimeout(connectToRabbitMQ, 5000);
     }
 }
 
-// --- Lógica de Simulación ---
-async function handleMessage(msg) {
+// --- Manejador de Mensajes de RabbitMQ ---
+async function handleRabbitMessage(msg) {
     if (msg === null) return;
-
     try {
         const event = JSON.parse(msg.content.toString());
         const { metadata, payload } = event;
-        const { taskId } = metadata;
-        const { nombreEvento } = payload;
-
-        // Solo reacciona a los eventos que le conciernen
-        if (nombreEvento === 'tarea.generar_plan') {
-            console.log(`[${taskId}] Recibido ${nombreEvento}. Simulando generación de plan...`);
-
-            // Simular un retraso de 5 segundos
-            setTimeout(() => {
-                const planId = uuidv4();
-                const planFalso = {
-                    pasos: [
-                        { "accion": "paso_1_falso", "descripcion": "Este es el primer paso simulado." },
-                        { "accion": "paso_2_falso", "descripcion": "Este es el segundo paso simulado." }
-                    ]
-                };
-
-                // Publicar el resultado falso
-                publishEvent(RESULTADOS_TOPIC, 'resultado.plan_generado', metadata, { planId, plan: planFalso });
-                console.log(`[${taskId}] Plan simulado generado y publicado.`);
-            }, 5000);
+        if (payload.nombreEvento === 'tarea.generar_plan') {
+            console.log(`[${metadata.taskId}] tarea.generar_plan recibido. Conectando a Jules Service...`);
+            initiateJulesSession(metadata, payload);
         }
-
-        // Aquí se añadirían más simulaciones, como para 'tarea.aprobar_plan'
-
     } catch (error) {
-        console.error('Error procesando mensaje en Mock Herrero:', error.message);
+        console.error('Error procesando mensaje de RabbitMQ:', error.message);
     }
 }
 
-// --- Función de Publicación ---
-function publishEvent(topic, nombreEvento, originalMetadata, payload) {
+// --- Lógica de Interacción con Jules Service ---
+function initiateJulesSession(originalMetadata, originalPayload) {
+    const ws = new WebSocket(JULES_SERVICE_URL);
+
+    ws.on('open', () => {
+        console.log(`[${originalMetadata.taskId}] Conexión WebSocket con Jules Service establecida.`);
+        const startCommand = {
+            type: 'start',
+            prompt: originalPayload.prompt,
+            // Podríamos añadir más datos si fueran necesarios
+        };
+        ws.send(JSON.stringify(startCommand));
+    });
+
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            console.log(`[${originalMetadata.taskId}] Mensaje recibido de Jules Service:`, data.type);
+
+            if (data.type === 'status_update' && data.status === 'SESSION_COMPLETED') {
+                const prOutput = data.outputs.find(o => o.type === 'pullRequest');
+                if (prOutput) {
+                    console.log(`[${originalMetadata.taskId}] Sesión completada. PR encontrada: ${prOutput.url}`);
+                    publishToRabbit(RESULTADOS_TOPIC, 'resultado.pr_generada', originalMetadata, {
+                        pullRequestUrl: prOutput.url
+                    });
+                } else {
+                    console.error(`[${originalMetadata.taskId}] Sesión completada, pero no se encontró una Pull Request en los outputs.`);
+                }
+                ws.close();
+            } else if (data.type === 'error') {
+                console.error(`[${originalMetadata.taskId}] Error recibido de Jules Service:`, data.message);
+            }
+        } catch (error) {
+            console.error(`[${originalMetadata.taskId}] Error procesando mensaje de Jules Service:`, error.message);
+        }
+    });
+
+    ws.on('close', () => {
+        console.log(`[${originalMetadata.taskId}] Conexión WebSocket con Jules Service cerrada.`);
+    });
+
+    ws.on('error', (error) => {
+        console.error(`[${originalMetadata.taskId}] Error de WebSocket:`, error.message);
+        // Podríamos publicar un evento de error de vuelta a RabbitMQ
+    });
+}
+
+// --- Función para Publicar de Vuelta a RabbitMQ ---
+function publishToRabbit(topic, nombreEvento, originalMetadata, payload) {
+    if (!rabbitChannel) {
+        console.error("No se puede publicar en RabbitMQ, el canal no está disponible.");
+        return;
+    }
     const { taskId } = originalMetadata;
     const newTraceId = uuidv4();
-
     const event = {
         metadata: {
             taskId,
             traceId: newTraceId,
             timestamp: new Date().toISOString(),
-            originator: 'mock-herrero-adapter-service'
+            originator: 'herrero-adapter-service'
         },
         payload: {
             nombreEvento,
             ...payload
         }
     };
-
-    channel.sendToQueue(topic, Buffer.from(JSON.stringify(event)));
-    console.log(`[${taskId}] Evento simulado publicado: ${nombreEvento}`);
+    rabbitChannel.sendToQueue(topic, Buffer.from(JSON.stringify(event)));
+    console.log(`[${taskId}] Evento '${nombreEvento}' publicado de vuelta al event-bus.`);
 }
 
 // --- Iniciar Servicio ---
