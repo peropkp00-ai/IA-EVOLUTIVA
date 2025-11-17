@@ -70,6 +70,17 @@ services:
     depends_on:
       - event-bus
 
+  # Jules Service (el Herrero real)
+  jules-service:
+    build:
+      context: ./jules-service
+    container_name: jules-service
+    ports:
+      - "8080:8080" # Exponer el puerto del servidor WebSocket
+    networks:
+      - ia_evolutiva_net
+    # Este servicio no depende del event-bus, es independiente
+
 # Definición de la red personalizada para los servicios
 networks:
   ia_evolutiva_net:
