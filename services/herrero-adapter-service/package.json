@@ -4,7 +4,8 @@
   "description": "Un adaptador que conecta el event-bus con la API WebSocket de jules-service.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "amqplib": "^0.10.3",

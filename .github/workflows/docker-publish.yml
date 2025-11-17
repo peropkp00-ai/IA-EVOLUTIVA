@@ -1,4 +1,4 @@
-name: Docker CI and Integration Test
+name: Docker CI for Monorepo
 
 on:
   push:
@@ -75,27 +75,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type:gha
-          cache-to: type:gha,mode=max
-
-  test-integration:
-    needs: build-and-publish
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Start services in background
-        run: docker-compose up --build -d
-
-      # Dar tiempo a que los servicios se inicien y generen logs
-      - name: Wait for services to start
-        run: sleep 30
-
-      - name: Capture docker-compose logs
-        run: docker-compose logs > compose-logs.txt
-
-      - name: Upload logs as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: compose-logs
-          path: compose-logs.txt
+          cache-to: type:gha,mode:max

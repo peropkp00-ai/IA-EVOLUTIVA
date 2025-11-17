@@ -1,0 +1,31 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: ['gateway-service', 'herrero-adapter-service', 'logging-service', 'orchestrator-service', 'sandbox-service']
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20.x'
+
+    - name: Install Dependencies for ${{ matrix.service }}
+      run: npm install
+      working-directory: ./services/${{ matrix.service }}
+
+    - name: Run Tests for ${{ matrix.service }}
+      run: npm test
+      working-directory: ./services/${{ matrix.service }}
